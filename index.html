@@ -107,7 +107,326 @@ const $=s=>document.querySelector(s), E=s=>String(s).replace(/[&<>"']/g,c=>({'&'
 const shuffle=a=>{let b=a.slice();for(let i=b.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b};const key='neon.art.atelier.v1';let state={name:'Explorer',badges:[],best:[],stars:0,mode:'free'},storage=true;
 try{state={...state,...JSON.parse(localStorage.getItem(key)||'{}')}}catch(e){storage=false}function save(){try{localStorage.setItem(key,JSON.stringify(state))}catch(e){storage=false}}
 let route='home',filter='All',search='',gallery=null,round=null,build={arch:null,detail:null},match=null;
-function curator(){return `<svg viewBox="0 0 280 180" role="img" aria-label="Original friendly gallery-guide character"><rect x="9" y="9" width="262" height="162" rx="25" fill="#0c1732" stroke="#466391"/><path d="M52 126H91V155H52ZM187 55H231V126H187" stroke="#74d7ff" stroke-width="3" fill="#273a69"/><path d="M198 66 220 82 200 113" stroke="#80edbe" stroke-width="4"/><path d="M86 154Q86 104 140 104Q194 104 194 154" fill="#b7a2ff"/><rect x="95" y="55" width="89" height="64" rx="27" fill="#80edbe"/><path d="M86 64Q86 26 140 26Q194 26 194 64Z" fill="#74d7ff"/><circle cx="128" cy="27" r="7" fill="#b7a2ff"/><circle cx="121" cy="85" r="5" fill="#102445"/><circle cx="158" cy="85" r="5" fill="#102445"/><path d="M132 99Q140 107 149 99" stroke="#102445" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M178 129 211 145M100 130 72 113" stroke="#80edbe" stroke-width="12" stroke-linecap="round"/><path d="M73 102V126M61 114H85" stroke="#74d7ff" stroke-width="3"/><circle cx="140" cy="136" r="7" fill="#74d7ff"/></svg>`}
+/* Pixel Arcade shared character profile, schema v1. Device-only (localStorage), no personal data.
+   Key: "pa.profile.v1". Values are INDEXES into the append-only lists below: add new entries at the END only. */
+(function(root){
+"use strict";
+var KEY="pa.profile.v1", NICK_MAX=12;
+var SKINS=["#ffdbb5","#f5c28f","#e0a370","#c68650","#9a5f34","#6b3f22","#5b8cff","#5fd068","#a3a7b5"];
+var HAIR_COLORS=["#1b1b2a","#5a3215","#a8642a","#ff5d8f","#29e7ff","#9b5cff","#eeeeee"];
+var OUTFITS=["#ff2e88","#29e7ff","#3dff6e","#ffd23f","#8a3ffc","#ff7a1a","#f5f5f5","#5b8cff"];
+var HAIR_STYLES=["bald","buzz","short","undercut","mohawk","messy","sidepart","curly","afro","bob","topknot","bun","twinbuns","wavy","ponytail","pigtails","braids","long"];
+/* styles 8+ map to a base style (index 0-7) for games that only know the first 8 */
+var STYLE_BASE={curly:"short",afro:"short",bob:"long",sidepart:"short",braids:"long",buzz:"short",topknot:"bun",messy:"spiky",wavy:"long",undercut:"short",mullet:"long",twinbuns:"bun"};
+var ACCESSORIES=["none","cap","glasses","headphones","crown","sunglasses","wizardHat","beanie","bow","headband","goggles","halo","horns","bunnyEars","catEars","eyepatch","mask","earrings"];
+var EYES=["dot","wide","sleepy","happy","wink","sparkle","heart","slit","round","cross","lashes","star"];
+var MOUTHS=["smile","grin","open","neutral","smirk","tongue","oh","kitty","frown","braces","fang","laugh"];
+var OUTFIT_STYLES=["tee","hoodie","jacket","dress","robe","armor","overalls","suit","labcoat","stripes","vest","none"];
+var EXTRAS=["beard","cape","gloves","magicBoots","freckles","blush","scar","moustache","brows","wristband","backpack","scarf"];
+var BLOCK=["FUCK","FUK","FCK","SHIT","BITCH","CUNT","DICK","COCK","PUSSY","ASSHOLE","BASTARD","WANK","TWAT","SLUT","WHORE","PISS","BOLLOCK","PENIS","VAGINA","SEX","PORN","NAZI","HITLER","RAPE","NIGG","NIGA","FAGG","RETARD","SPAZ","IDIOT","STUPID"];
+var ALLOW=["SUSSEX","ESSEX","SEXTON","COCKATOO","COCKATIEL","DICKENS","HANCOCK","PEACOCK","GRAPE","DRAPE","SCRAPE","TRAPE"];
+function defaults(){return {v:1,name:"",skin:1,hairStyle:"short",hairColor:0,outfit:1,accessory:"none",extras:{},
+ skinHex:SKINS[1],hairHex:HAIR_COLORS[0],outfitHex:OUTFITS[1],accentHex:"#ffd23f",eyeHex:"#14102c",eyes:0,mouth:0,outfitStyle:0,updated:0}}
+function hex(v,d){return (typeof v==="string"&&/^#[0-9a-fA-F]{6}$/.test(v))?v.toLowerCase():d}
+function rgb(h){return [parseInt(h.substr(1,2),16),parseInt(h.substr(3,2),16),parseInt(h.substr(5,2),16)]}
+function nearest(h,list){var a=rgb(h),b=0,bd=1e9;list.forEach(function(c,i){var x=rgb(c),d=0;for(var k=0;k<3;k++)d+=(a[k]-x[k])*(a[k]-x[k]);if(d<bd){bd=d;b=i}});return b}
+function baseStyle(st){return STYLE_BASE[st]||st}
+function cleanNickname(s){return String(s||"").toUpperCase().replace(/[^A-Z0-9 \-!._]/g,"").replace(/\s+/g," ").trim().slice(0,NICK_MAX)}
+function nicknameProblem(raw){var n=cleanNickname(raw);if(!n)return null;
+ var q=n.replace(/0/g,"O").replace(/[1!]/g,"I").replace(/3/g,"E").replace(/4/g,"A").replace(/5/g,"S").replace(/7/g,"T").replace(/[^A-Z]/g,"");
+ ALLOW.forEach(function(w){q=q.split(w).join("#")});
+ return BLOCK.some(function(w){return q.indexOf(w)>=0})?"Pick a friendlier nickname":null}
+function idx(v,len,d){return (typeof v==="number"&&isFinite(v)&&v>=0&&v<len)?Math.floor(v):d}
+function pick(v,list,d){return list.indexOf(v)>=0?v:d}
+/* Validate anything into a safe profile. Unknown fields are kept in .rest so writers can preserve them. */
+function clean(o){var d=defaults();if(!o||typeof o!=="object")return d;
+ var r={v:1,name:cleanNickname(o.name),hairStyle:pick(o.hairStyle,HAIR_STYLES,d.hairStyle),accessory:pick(o.accessory,ACCESSORIES,d.accessory),
+  eyes:idx(o.eyes,EYES.length,0),mouth:idx(o.mouth,MOUTHS.length,0),outfitStyle:idx(o.outfitStyle,OUTFIT_STYLES.length,0),
+  extras:{},updated:typeof o.updated==="number"?o.updated:0};
+ /* hex colours are the truth when present; the index fields are always the nearest palette entry so index-only readers keep working */
+ r.skinHex=hex(o.skinHex,null)||SKINS[idx(o.skin,SKINS.length,d.skin)];
+ r.hairHex=hex(o.hairHex,null)||HAIR_COLORS[idx(o.hairColor,HAIR_COLORS.length,d.hairColor)];
+ r.outfitHex=hex(o.outfitHex,null)||OUTFITS[idx(o.outfit,OUTFITS.length,d.outfit)];
+ r.accentHex=hex(o.accentHex,d.accentHex);r.eyeHex=hex(o.eyeHex,d.eyeHex);
+ r.skin=nearest(r.skinHex,SKINS);r.hairColor=nearest(r.hairHex,HAIR_COLORS);r.outfit=nearest(r.outfitHex,OUTFITS);
+ EXTRAS.forEach(function(k){if(o.extras&&o.extras[k]===true)r.extras[k]=true});
+ if(nicknameProblem(r.name))r.name="";
+ return r}
+function migrate(o){return o} /* v1 is the first version. A future v2 reads pa.profile.v1 here and converts. */
+function raw(){try{return JSON.parse(root.localStorage.getItem(KEY))}catch(e){return null}}
+function load(){return clean(migrate(raw()))}
+function exists(){return !!raw()}
+function save(p){var c=clean(p),old=raw()||{},out={};
+ for(var k in old)out[k]=old[k]; /* preserve unknown fields */
+ for(var j in c)out[j]=c[j]; c.updated=out.updated=Date.now();
+ try{root.localStorage.setItem(KEY,JSON.stringify(out));return true}catch(e){return false}}
+function onChange(cb){root.addEventListener("storage",function(e){if(e.key===KEY||e.key===null)cb(load())})}
+/* 16x16 pixel renderer, used by the hub; games may use it or draw the profile in their own style. */
+function shade(h,f){var c=rgb(h).map(function(v){return Math.max(0,Math.min(255,Math.round(v*f)))});return "#"+c.map(function(v){return ("0"+v.toString(16)).slice(-2)}).join("")}
+function sprite(p){p=clean(p);var g=[],i,j;for(i=0;i<16;i++){g.push([]);for(j=0;j<16;j++)g[i].push(null)}
+ function s(x,y,c){if(x>=0&&x<16&&y>=0&&y<16)g[y][x]=c}
+ function r(x0,y0,x1,y1,c){for(var y=y0;y<=y1;y++)for(var x=x0;x<=x1;x++)s(x,y,c)}
+ var sk=p.skinHex,hc=p.hairHex,oc=p.outfitHex,ac=p.accentHex,ec=p.eyeHex,ex=p.extras,ink="#14102c",mc="#b0453a";
+ if(ex.cape)r(2,11,13,15,"#7a1fa2");
+ r(3,11,12,15,oc);r(2,11,2,13,oc);r(13,11,13,13,oc);r(2,14,2,14,ex.gloves?"#ffffff":sk);r(13,14,13,14,ex.gloves?"#ffffff":sk);
+ var os=({10:8,11:0})[p.outfitStyle]!==undefined?({10:8,11:0})[p.outfitStyle]:p.outfitStyle;
+ if(os===1){r(5,11,10,11,shade(oc,0.7));s(7,13,ac);s(8,13,ac)}
+ if(os===2)r(7,12,7,15,ac);
+ if(os===3){r(2,13,13,15,oc);r(2,15,13,15,ac)}
+ if(os===4){r(3,15,12,15,ac);r(7,11,8,15,ac)}
+ if(os===5){r(3,11,12,12,"#9aa7c7");r(6,13,9,15,ac)}
+ if(os===6)r(5,13,10,15,ac);
+ if(os===7){r(6,11,9,12,"#ffffff");r(7,12,8,15,ac)}
+ if(os===8){r(3,11,12,15,"#f5f5f5");r(6,11,9,15,oc)}
+ if(os===9){r(3,12,12,12,ac);r(3,14,12,14,ac)}
+ if(os===0||os===1||os===2||os===6||os===7||os===8||os===9)r(3,15,12,15,ac);
+ s(2,13,ac);s(13,13,ac);r(5,11,6,11,ac);r(9,11,10,11,ac);
+ r(7,11,8,11,sk);
+ if(ex.magicBoots){r(4,15,5,15,"#ffd23f");r(10,15,11,15,"#ffd23f")}
+ if(ex.wristband){s(2,13,"#2de2c8");s(13,13,"#2de2c8")}
+ if(ex.backpack){r(4,11,4,12,"#3a7bff");r(11,11,11,12,"#3a7bff")}
+ if(ex.scarf){r(6,11,9,11,"#3ddc84");s(7,12,"#3ddc84");s(8,12,"#2fb86e")}
+ r(4,4,11,10,sk);s(4,4,null);s(11,4,null);s(4,10,null);s(11,10,null);
+ var e=({10:1,11:5})[p.eyes]!==undefined?({10:1,11:5})[p.eyes]:p.eyes;
+ if(e===0){s(6,7,ec);s(9,7,ec)}
+ if(e===1){r(6,7,6,8,ec);r(9,7,9,8,ec)}
+ if(e===2){r(5,7,6,7,ec);r(9,7,10,7,ec)}
+ if(e===3){s(5,8,ec);s(6,7,ec);s(9,7,ec);s(10,8,ec)}
+ if(e===4){s(6,7,ec);r(9,7,10,7,ec)}
+ if(e===5){s(6,6,ec);s(5,7,ec);s(6,7,ec);s(7,7,ec);s(6,8,ec);s(9,6,ec);s(8,7,ec);s(9,7,ec);s(10,7,ec);s(9,8,ec)}
+ if(e===6){[[5,6],[7,6],[5,7],[6,7],[7,7],[6,8]].forEach(function(q){s(q[0],q[1],"#ff3fa4");s(q[0]+3,q[1],"#ff3fa4")})}
+ if(e===7){r(6,6,6,8,ec);r(9,6,9,8,ec)}
+ if(e===8){r(5,7,6,8,ec);r(9,7,10,8,ec);s(5,7,"#ffffff");s(9,7,"#ffffff")}
+ if(e===9){[[5,6],[7,6],[6,7],[5,8],[7,8]].forEach(function(q){s(q[0],q[1],ec);s(q[0]+3,q[1],ec)})}
+ var m=({10:0,11:2})[p.mouth]!==undefined?({10:0,11:2})[p.mouth]:p.mouth;
+ if(m===0){s(6,9,mc);s(7,10,mc);s(8,10,mc);s(9,9,mc)}
+ if(m===1){r(6,9,9,9,"#ffffff");s(5,9,mc);s(10,9,mc);r(6,10,9,10,mc)}
+ if(m===2)r(7,9,8,10,"#5a1f1f");
+ if(m===3)r(7,9,8,9,mc);
+ if(m===4){r(7,9,8,9,mc);s(9,8,mc)}
+ if(m===5){r(7,9,8,9,mc);s(8,10,"#ff6b8a")}
+ if(m===6)r(7,9,8,10,"#7a2a2a");
+ if(m===7){s(6,9,mc);s(7,10,mc);s(8,9,mc);s(9,10,mc)}
+ if(m===8){s(6,10,mc);s(7,9,mc);s(8,9,mc);s(9,10,mc)}
+ if(m===9){r(6,9,9,9,"#ffffff");s(7,9,"#9aa7c7");s(9,9,"#9aa7c7")}
+ if(ex.freckles){var fk=shade(sk,0.72);[[5,8],[6,9],[9,9],[10,8]].forEach(function(q){if(!(m===1&&q[1]===9))s(q[0],q[1],fk)})}
+ if(ex.blush){s(5,8,"#ff8fa8");s(10,8,"#ff8fa8")}
+ if(ex.scar){s(10,5,"#c04a4a");s(10,6,"#c04a4a")}
+ if(ex.moustache)r(6,8,9,8,hc);
+ if(ex.brows){r(5,6,6,6,shade(hc,0.8));r(9,6,10,6,shade(hc,0.8))}
+ if(ex.beard){r(5,9,10,10,hc);if(m===0)r(7,9,8,9,mc);else r(7,9,8,9,mc)}
+ var h=p.hairStyle;
+ if(h!=="bald"&&h!=="mohawk"&&h!=="buzz"){r(5,3,10,3,hc);r(4,4,11,4,hc);s(4,5,hc);s(11,5,hc)}
+ if(h==="buzz"){r(5,3,10,3,shade(hc,0.8));r(4,4,11,4,shade(hc,0.8))}
+ if(h==="spiky"||h==="messy"){[5,6,8,9,10].forEach(function(x){s(x,2,hc)});s(7,1,hc);if(h==="messy"){s(9,1,hc);s(4,3,hc);s(11,3,hc)}}
+ if(h==="long"){r(3,5,4,12,hc);r(11,5,12,12,hc)}
+ if(h==="bun"){r(7,1,8,2,hc)}
+ if(h==="topknot"){r(7,0,8,2,hc)}
+ if(h==="twinbuns"){r(4,1,5,2,hc);r(10,1,11,2,hc)}
+ if(h==="pigtails"){r(3,6,3,9,hc);r(12,6,12,9,hc);s(4,5,hc);s(11,5,hc)}
+ if(h==="ponytail"){r(12,5,12,10,hc);s(13,10,hc)}
+ if(h==="mohawk"){r(7,0,8,4,hc);r(6,3,9,3,hc)}
+ if(h==="curly"){r(4,2,11,3,hc);s(3,4,hc);s(12,4,hc);s(3,6,hc);s(12,6,hc)}
+ if(h==="afro"){r(3,1,12,3,hc);r(2,3,3,8,hc);r(12,3,13,8,hc);r(3,2,12,2,hc)}
+ if(h==="bob"){r(3,5,4,8,hc);r(11,5,12,8,hc)}
+ if(h==="sidepart"){r(5,3,10,3,hc);r(4,4,11,4,hc);s(4,5,hc);s(5,5,hc);s(11,5,hc)}
+ if(h==="braids"){r(3,5,3,12,hc);r(12,5,12,12,hc);s(3,8,shade(hc,0.7));s(12,8,shade(hc,0.7));s(3,11,shade(hc,0.7));s(12,11,shade(hc,0.7))}
+ if(h==="wavy"){r(3,5,4,11,hc);r(11,5,12,11,hc);s(2,7,hc);s(13,9,hc)}
+ if(h==="undercut"){r(5,2,10,3,hc);r(4,4,11,4,shade(hc,0.8))}
+ if(h==="mullet"){r(5,2,10,3,hc);r(3,5,4,5,hc);r(11,5,12,5,hc);r(4,9,11,11,hc)}
+ if(h!=="bald"&&h!=="buzz"&&h!=="mohawk"){s(10,4,ac);s(10,5,shade(ac,0.8))}
+ var a=p.accessory;
+ if(a==="cap"){r(4,3,11,4,"#e84a4a");r(3,5,7,5,"#b83030")}
+ if(a==="glasses"){r(5,7,6,7,ink);r(9,7,10,7,ink);r(7,7,8,7,ink);s(6,7,"#ffffff");s(9,7,"#ffffff")}
+ if(a==="sunglasses")r(5,7,10,8,"#14102c");
+ if(a==="goggles"){r(5,6,10,6,"#8a6a3a");r(5,7,6,8,"#29e7ff");r(9,7,10,8,"#29e7ff")}
+ if(a==="headphones"){r(4,3,11,3,"#9aa7c7");r(3,6,3,8,"#29e7ff");r(12,6,12,8,"#29e7ff")}
+ if(a==="crown"){r(5,2,10,3,"#ffd23f");s(5,1,"#ffd23f");s(7,1,"#ffd23f");s(9,1,"#ffd23f");s(10,1,"#ffd23f");s(6,1,null);s(8,1,null)}
+ if(a==="wizardHat"){r(3,4,12,4,"#5b3fd0");r(5,3,10,3,"#5b3fd0");r(6,2,9,2,"#5b3fd0");r(7,1,8,1,"#5b3fd0");s(8,0,"#5b3fd0");r(5,3,10,3,ac)}
+ if(a==="beanie"){r(4,2,11,4,ac);r(4,4,11,4,shade(ac,0.7));s(7,1,"#ffffff");s(8,1,"#ffffff")}
+ if(a==="bow"){r(9,2,11,3,ac);s(10,3,shade(ac,0.6))}
+ if(a==="headband"){r(4,4,11,4,ac)}
+ if(a==="halo"){r(5,0,10,0,"#ffd23f");s(4,1,"#ffd23f");s(11,1,"#ffd23f");r(5,2,10,2,null)}
+ if(a==="horns"){s(4,2,"#ff4d4d");s(4,3,"#ff4d4d");s(11,2,"#ff4d4d");s(11,3,"#ff4d4d");s(3,1,"#ff4d4d");s(12,1,"#ff4d4d")}
+ if(a==="bunnyEars"){r(5,0,5,3,"#ffffff");r(10,0,10,3,"#ffffff");r(6,1,6,2,"#ffb3d1")}
+ if(a==="catEars"){s(4,2,hc);s(5,3,hc);s(5,2,hc);s(11,2,hc);s(10,3,hc);s(10,2,hc);s(4,1,hc);s(11,1,hc)}
+ if(a==="eyepatch"){r(5,7,6,8,"#14102c");r(4,5,11,5,"#14102c")}
+ if(a==="mask"){r(4,8,11,10,"#f5f5f5");r(4,8,11,8,"#f5f5f5")}
+ if(a==="earrings"){s(3,8,"#ffd23f");s(12,8,"#ffd23f")}
+ return g}
+/* opts: {outline:true} adds a 1px dark outline (kawaii look); {crop:[x,y,w,h]} draws only part of the 16x16 grid. */
+function draw(canvas,p,scale,opts){scale=scale||8;opts=opts||{};var g=sprite(p),c=canvas.getContext("2d"),cr=opts.crop||[0,0,16,16],ol=opts.outline?1:0;
+ var W=(cr[2]+2*ol)*scale,H=(cr[3]+2*ol)*scale;canvas.width=W;canvas.height=H;c.clearRect(0,0,W,H);
+ function at(x,y){return (x>=0&&x<16&&y>=0&&y<16)?g[y][x]:null}
+ if(ol){c.fillStyle=opts.outlineColor||"#5b3a6b";for(var y=cr[1]-1;y<=cr[1]+cr[3];y++)for(var x=cr[0]-1;x<=cr[0]+cr[2];x++){
+  if(at(x,y))continue;if(at(x-1,y)||at(x+1,y)||at(x,y-1)||at(x,y+1))c.fillRect((x-cr[0]+ol)*scale,(y-cr[1]+ol)*scale,scale,scale)}}
+ for(var y2=cr[1];y2<cr[1]+cr[3];y2++)for(var x2=cr[0];x2<cr[0]+cr[2];x2++){var v=at(x2,y2);if(v){c.fillStyle=v;c.fillRect((x2-cr[0]+ol)*scale,(y2-cr[1]+ol)*scale,scale,scale)}}}
+root.PAProfile={KEY:KEY,SKINS:SKINS,HAIR_COLORS:HAIR_COLORS,OUTFITS:OUTFITS,HAIR_STYLES:HAIR_STYLES,ACCESSORIES:ACCESSORIES,EXTRAS:EXTRAS,EYES:EYES,MOUTHS:MOUTHS,OUTFIT_STYLES:OUTFIT_STYLES,STYLE_BASE:STYLE_BASE,baseStyle:baseStyle,nearest:nearest,hex:hex,
+ NICK_MAX:NICK_MAX,defaults:defaults,clean:clean,cleanNickname:cleanNickname,nicknameProblem:nicknameProblem,load:load,save:save,exists:exists,onChange:onChange,sprite:sprite,draw:draw};
+})(typeof window!=="undefined"?window:this);
+
+/* PAProfile.drawPixel(canvas, profile, scale, opts): 24x28 pixel kawaii chibi, same pa.profile.v1 fields. opts.view=[x,y,w,h] crops to a region of the grid. */
+(function(root){
+"use strict";
+var P=root.PAProfile,GW=24,GH=28,INK="#3d2250";
+function rgb(h){return [parseInt(h.substr(1,2),16),parseInt(h.substr(3,2),16),parseInt(h.substr(5,2),16)]}
+function sh(h,f){var c=rgb(h).map(function(v){return Math.max(0,Math.min(255,Math.round(f>1?v+(255-v)*(f-1):v*f)))});return "#"+c.map(function(v){return ("0"+v.toString(16)).slice(-2)}).join("")}
+function grid(p){
+ p=P.clean(p);var g=[],x,y;for(y=0;y<GH;y++){g.push([]);for(x=0;x<GW;x++)g[y].push(null)}
+ var sk=p.skinHex,hc=p.hairHex,oc=p.outfitHex,ac=p.accentHex,ec=p.eyeHex,ex=p.extras||{};
+ var st=p.hairStyle,acc=p.accessory,skL=sh(sk,1.12),skD=sh(sk,.84),hL=sh(hc,1.4),hD=sh(hc,.7),oL=sh(oc,1.3),oD=sh(oc,.72);
+ function s(x,y,c){x=Math.round(x);y=Math.round(y);if(x>=0&&x<GW&&y>=0&&y<GH)g[y][x]=c}
+ function r(x0,y0,x1,y1,c){for(var y=y0;y<=y1;y++)for(var x=x0;x<=x1;x++)s(x,y,c)}
+ function ell(cx,cy,rx,ry,c,clip){for(var y=0;y<GH;y++)for(var x=0;x<GW;x++){var dx=(x+.5-cx)/rx,dy=(y+.5-cy)/ry;if(dx*dx+dy*dy<=1&&(!clip||clip(x,y)))g[y][x]=c}}
+ function row(y,xs,c){xs.forEach(function(x){s(x,y,c)})}
+ /* cape */
+ if(ex.cape){r(3,19,20,27,"#7a1fa2");r(3,25,20,27,"#5d1580");r(7,18,16,19,"#8e2bc0");s(8,18,"#ffd23f");s(15,18,"#ffd23f")}
+ if(ex.backpack){r(2,20,4,25,"#3a7bff");r(19,20,21,25,"#3a7bff");r(2,24,4,25,"#2f66d4");r(19,24,21,25,"#2f66d4")}
+ /* back hair */
+ if(st==="long"||st==="wavy"||st==="mullet"){ell(12,15,10.2,9.5,hc,function(x,y){return y<=23});r(5,20,18,23,hD);if(st==="wavy"){row(22,[3,5,7,16,18,20],hc);row(23,[4,6,17,19],hD)}}
+ if(st==="braids"){r(3,10,6,25,hc);r(17,10,20,25,hc);for(var i=11;i<25;i+=3){row(i,[3,4,5,6,17,18,19,20],hD)}}
+ if(st==="bob"){ell(12,12.5,10,6.5,hc);ell(12,16,9,2.6,hD)}
+ if(st==="pigtails"){ell(3.5,17,2.8,6,hc);ell(20.5,17,2.8,6,hc)}
+ if(st==="ponytail"){ell(20.5,11,2.6,6,hc);r(19,5,20,7,hc)}
+ if(st==="bun"){ell(12,2.5,4,3,hc);ell(12,2.5,2.5,1.5,hL)}
+ if(st==="topknot"){ell(12,2,3,2.5,hc)}
+ if(st==="twinbuns"){ell(5,3.5,3.2,3,hc);ell(19,3.5,3.2,3,hc)}
+ if(st==="afro"||st==="curly"){ell(12,8.5,11,8.5,hc);ell(12,8.5,11,8.5,hc)}
+ if(acc==="bunnyEars"){ell(8,0,2.2,5,"#ffffff");ell(8,1,1,3,"#ffb3cf");ell(16,0,2.2,5,"#ffffff");ell(16,1,1,3,"#ffb3cf")}
+ /* body */
+ r(7,20,16,27,oc);r(6,21,17,27,oc);r(5,22,18,27,oc);
+ r(6,25,17,27,oD);r(5,26,18,27,oD);
+ r(9,20,14,21,oL);
+ var os=p.outfitStyle;
+ if(os===1){r(9,20,14,21,oD);row(20,[10,13],ac);r(11,22,12,25,oD);s(10,22,ac);s(13,22,ac)}
+ if(os===2){r(11,20,12,27,ac);row(23,[10,13],oD);}
+ if(os===3){r(5,24,18,27,oc);r(5,27,18,27,ac);r(6,26,17,26,oL)}
+ if(os===4){r(10,20,13,21,ac);s(11,22,ac);s(12,22,ac)}
+ if(os===5){r(5,20,18,22,"#aab6d4");r(5,20,18,20,"#d4def2");r(10,23,13,25,ac)}
+ if(os===6){r(8,23,15,27,ac);r(8,23,15,23,sh(ac,1.3));row(21,[8,15],ac);row(22,[8,15],ac)}
+ if(os===7){r(10,20,13,21,"#ffffff");s(11,22,ac);s(12,22,ac);r(11,23,12,27,ac)}
+ if(os===8){r(6,21,17,27,"#f4f8ff");r(6,26,17,27,"#cfd8ea");s(9,22,oc);s(14,22,oc)}
+ if(os===9){for(var yy=22;yy<=26;yy+=2)r(5,yy,18,yy,ac)}
+ if(os===10){r(10,20,13,21,"#ffffff");r(11,22,12,27,"#ffffff");r(7,20,9,27,oc);r(14,20,16,27,oc);r(6,21,6,27,oc);r(17,21,17,27,oc);r(5,22,5,27,oc);r(18,22,18,27,oc);r(10,21,13,21,skD);r(10,20,13,20,sk);r(11,22,12,27,sk);row(23,[11,12],skD);row(25,[11,12],skD);r(7,26,9,27,oD);r(14,26,16,27,oD);row(24,[8,15],ac);row(25,[8,15],ac)}
+ if(os===11){r(5,20,18,27,sk);r(5,26,18,27,skD);r(9,20,14,20,skD);r(6,20,17,20,skD);r(4,21,5,21,sk);r(18,21,19,21,sk);r(5,26,18,27,oc);r(5,26,18,26,oL);r(6,27,17,27,oD)}
+ /* hands */
+ r(3,22,4,25,ex.gloves?"#ffffff":sk);r(19,22,20,25,ex.gloves?"#ffffff":sk);row(25,[3,4,19,20],ex.gloves?"#d4def2":skD);
+ r(4,21,5,21,oc);r(18,21,19,21,oc);
+ if(ex.backpack){r(7,20,8,23,"#3a7bff");r(15,20,16,23,"#3a7bff");s(7,22,"#ffd23f");s(16,22,"#ffd23f")}
+ if(ex.wristband){r(3,22,4,23,"#2de2c8");r(19,22,20,23,"#2de2c8");s(3,22,"#bffff2");s(20,22,"#bffff2")}
+ if(ex.magicBoots){r(6,24,9,27,"#ffd23f");r(14,24,17,27,"#ffd23f");r(6,26,9,27,"#e0a92e");r(14,26,17,27,"#e0a92e");s(7,24,"#fff2a8");s(15,24,"#fff2a8")}
+ /* neck */
+ r(10,18,13,20,skD);
+ /* head */
+ ell(12,11.5,9,7.7,sk);
+ for(var qy=15;qy<=19;qy++)for(var qx=3;qx<=21;qx++)if(g[qy][qx]===sk&&(!g[qy+1]||g[qy+1][qx]!==sk))g[qy][qx]=skD;
+ /* shadow underside */
+ 
+ /* ears */
+ r(2,11,3,14,sk);r(20,11,21,14,sk);r(2,13,2,14,skD);r(21,13,21,14,skD);
+ /* front hair */
+ var top=function(c1,c2){ /* hair cap over upper head */
+  ell(12,10,10,8,c1,function(x,y){return y<=9||(y<=11&&(x<5||x>18))});
+  r(4,10,5,13,c1);r(18,10,19,13,c1);
+  ell(11,7.5,6.2,3.6,c2,function(x,y){return y<=8});
+  row(5,[8,9,10],hL);s(7,6,hL);
+ };
+ if(st!=="bald"){
+  if(st==="spiky"||st==="messy"){top(hc,hc);[[5,5],[8,2],[11,1],[14,2],[17,4],[19,7],[6,3],[9,3],[12,3],[15,3]].forEach(function(q){s(q[0],q[1],hc);s(q[0],q[1]+1,hc)});row(10,[6,8,11,13,15,17],hc);row(9,[8,11,15],hc)}
+  else if(st==="mohawk"){top(hc,hc);r(10,0,13,6,hc);r(11,0,12,2,hL);r(5,5,7,9,sk);r(16,5,18,9,sk)}
+  else if(st==="buzz"||st==="undercut"){ell(12,9.5,9,6.6,hD,function(x,y){return y<=8});row(8,[6,7,8,9,10,11,12,13,14,15,16,17],hc);row(7,[8,9,10,13,14,15],hL)}
+  else if(st==="sidepart"){top(hc,hc);r(11,7,12,10,hD);r(6,10,10,10,hc);row(10,[7,8],hc);row(10,[15,16,17],hc)}
+  else{top(hc,hc);
+   /* fringe pieces */
+   row(10,[6,7,8,9,11,12,14,15,16,17],hc);
+   if(st==="long"||st==="wavy"||st==="bob"||st==="mullet"||st==="braids"){r(4,10,5,16,hc);r(18,10,19,16,hc)}
+   if(st==="curly"||st==="afro"){[[4,8],[7,3],[12,1],[17,3],[20,8]].forEach(function(q){ell(q[0],q[1],3,2.6,hc)})}
+  }
+  /* dark parting line under fringe */
+  for(var xi=6;xi<=17;xi++){if(g[10][xi]===hc&&g[11][xi]!==hc&&g[11][xi])g[10][xi]=hD}
+ }
+ /* blush */
+ var bc=ex.blush?"#ff6f95":"#ff9db8";row(14,[6,7,16,17],bc);if(ex.blush)row(15,[7,16],bc);
+ /* eyes: pixel big shiny */
+ function eye(x0,i){var e=P.EYES[p.eyes]||"dot";
+  if(e==="happy"||(e==="wink"&&i===1)){row(12,[x0+1,x0+2],INK);row(13,[x0,x0+3],INK);return}
+  if(e==="sleepy"){row(13,[x0,x0+1,x0+2,x0+3],INK);row(14,[x0+1,x0+2],sk);return}
+  if(e==="cross"){row(11,[x0,x0+3],INK);row(12,[x0+1,x0+2],INK);row(13,[x0,x0+3],INK);return}
+  var tall=e==="round"||e==="wide"||e==="lashes"||e==="star";
+  r(x0,11,x0+2,11,INK);r(x0,12,x0+2,14,sh(ec,.85));row(14,[x0,x0+1,x0+2],sh(ec,1.5));s(i?x0+3:x0-1,11,INK);s(x0+1,12,INK);s(x0+1,13,INK);
+
+  if(tall){row(10,[x0+1,x0+2],INK)}
+  s(x0,12,"#ffffff");s(x0+2,13,"#ffffff");
+  s(x0,12,"#ffffff");s(x0+2,13,"#ffffff");                       /* highlight */
+
+  if(e==="lashes"){s(i?x0+3:x0-1,10,INK);s(i?x0+4:x0-2,11,INK);s(x0,13,"#ffffff");s(x0+2,12,"#ffffff")}
+  if(e==="star"){r(x0,12,x0+2,14,"#ffe27a");s(x0+1,11,"#ffe27a");s(x0+1,12,"#fff7d0");s(x0+1,13,"#fff7d0");s(x0,14,"#ff9d2e");s(x0+2,14,"#ff9d2e");s(x0,12,"#ffffff");s(x0+2,13,"#ffffff")}
+  if(e==="heart"){s(x0+1,13,"#ff3d6e");s(x0+2,13,"#ff3d6e");s(x0+1,12,"#ff7a9c");s(x0+2,12,"#ff7a9c");s(x0+1,14,"#ff3d6e");s(x0+2,14,"#ff3d6e")}
+  if(e==="slit"){r(x0+1,12,x0+2,14,ec);s(x0+1,13,INK);s(x0+2,13,INK);s(x0+1,12,"#ffffff")}
+  if(e==="sparkle"){s(x0+2,12,"#ffffff");s(x0+1,14,"#ffe9a8")}
+  if(e==="dot"){r(x0,11,x0+3,14,sk);r(x0+1,12,x0+2,14,INK);s(x0+1,12,"#ffffff")}}
+ eye(7,0);eye(14,1);
+ /* mouth */
+ var m=P.MOUTHS[p.mouth]||"smile",mc="#b0453a";
+ if(m==="smile"){row(16,[11,12],INK);row(15,[10,13],INK)}
+ else if(m==="grin"){r(10,15,13,15,INK);r(11,16,12,16,"#ffffff");row(17,[11,12],INK)}
+ else if(m==="open"){r(11,15,12,16,INK);row(16,[11,12],"#e2506e")}
+ else if(m==="neutral"){row(16,[10,11,12,13],INK)}
+ else if(m==="smirk"){row(16,[10,11,12],INK);s(13,15,INK)}
+ else if(m==="tongue"){row(15,[10,11,12,13],INK);row(16,[11,12],"#ff7a9c")}
+ else if(m==="oh"){r(11,15,12,16,INK)}
+ else if(m==="kitty"){row(15,[10,12,13],INK);row(16,[11,12],INK);s(11,15,INK)}
+ else if(m==="frown"){row(15,[11,12],INK);row(16,[10,13],INK)}
+ else if(m==="fang"){row(15,[10,13],INK);row(16,[11,12],INK);s(11,17,"#ffffff");s(11,16,"#ffffff")}
+ else if(m==="laugh"){r(10,15,13,16,INK);row(15,[10,11,12,13],INK);r(11,16,12,16,"#e2506e");row(15,[11,12],"#ffffff")}
+ else if(m==="braces"){r(10,15,13,16,"#ffffff");row(15,[10,13],INK);row(16,[10,11,12,13],INK);row(15,[11,12],"#9aa7c7")}
+ if(ex.freckles){row(13,[7,9,15,17].map(function(q){return q}),null);[[6,13],[8,14],[15,14],[17,13]].forEach(function(q){s(q[0],q[1],sh(sk,.7))})}
+ if(ex.scar){row(8,[17],"#b0453a");row(9,[16],"#b0453a");row(10,[15],"#b0453a")}
+ if(ex.moustache){row(15,[8,9,10,13,14,15],hD)}
+ if(ex.beard){r(6,16,17,18,hc);r(9,15,14,15,sk);r(10,16,13,16,sk);row(16,[10,13],hc);r(10,17,13,17,hD)}
+ if(ex.brows){row(9,[7,8,9,14,15,16],hD)}
+ if(ex.scarf){r(8,18,15,19,"#3ddc84");r(8,19,15,19,"#2fb86e");r(10,20,12,23,"#3ddc84");r(10,23,12,23,"#2fb86e");s(11,21,"#b8ffd9")}
+ /* accessories */
+ var a=acc;
+ if(a==="cap"){r(5,4,18,8,"#e23b5a");r(6,3,17,3,"#e23b5a");r(5,9,20,9,sh("#e23b5a",.7));r(8,5,10,5,sh("#e23b5a",1.4))}
+ if(a==="beanie"){r(5,4,18,8,"#4aa3ff");r(6,3,17,3,"#4aa3ff");r(5,9,18,9,"#2d7fd6");ell(12,2,1.6,1.6,"#ffffff");row(5,[8,9],sh("#4aa3ff",1.4))}
+ if(a==="crown"){r(6,3,17,5,"#ffd23f");row(2,[6,9,12,15,17],"#ffd23f");row(1,[12],"#ffd23f");row(4,[8,12,16],"#ff3355");row(3,[7,10,13,16],"#fff2a8")}
+ if(a==="wizardHat"){r(3,7,20,8,"#5a3aa8");r(7,4,16,6,"#7a52d6");r(9,2,14,3,"#7a52d6");r(11,0,13,1,"#7a52d6");s(12,5,"#ffd23f");r(7,6,16,6,"#5a3aa8")}
+ if(a==="halo"){row(0,[8,9,10,11,12,13,14,15],"#ffd23f");row(1,[7,16],"#ffd23f");row(2,[8,9,10,11,12,13,14,15],"#ffd23f")}
+ if(a==="horns"){r(5,2,6,6,"#ff4466");s(5,1,"#ff4466");r(17,2,18,6,"#ff4466");s(18,1,"#ff4466")}
+ if(a==="catEars"){r(5,3,8,6,hc);r(6,3,7,4,"#ffb3cf");s(5,2,hc);r(15,3,18,6,hc);r(16,3,17,4,"#ffb3cf");s(18,2,hc)}
+ if(a==="bow"){r(16,4,17,7,"#ff5d8f");r(19,4,20,7,"#ff5d8f");r(18,5,18,6,"#ff2e88");s(16,4,sh("#ff5d8f",1.4))}
+ if(a==="headband"){r(5,7,18,8,ac);row(7,[8,9],sh(ac,1.4))}
+ if(a==="goggles"){r(5,7,18,7,"#444");r(6,5,10,8,"#8fe6ff");r(13,5,17,8,"#8fe6ff");row(5,[6,10,13,17],"#444");row(8,[6,10,13,17],"#444");s(7,6,"#ffffff");s(14,6,"#ffffff")}
+ if(a==="headphones"){r(4,4,5,13,"#333");r(18,4,19,13,"#333");r(5,3,18,3,"#333");r(2,10,4,14,ac);r(19,10,21,14,ac);r(2,10,2,14,"#333");r(21,10,21,14,"#333")}
+ if(a==="glasses"){r(6,10,10,15,"#2a2a2a");r(13,10,17,15,"#2a2a2a");r(7,11,9,14,null);r(14,11,17,14,null);row(12,[11,12],"#2a2a2a");eye(7,0);eye(14,1);s(7,11,"#d8f4ff");s(14,11,"#d8f4ff")}
+ if(a==="sunglasses"){r(6,11,10,14,"#14102c");r(13,11,17,14,"#14102c");row(12,[11,12],"#14102c");row(12,[7,8,14,15],"#4a3a7a")}
+ if(a==="eyepatch"){r(6,10,10,15,"#222");row(8,[7,8,9,10,11,12,13,14,15,16,17],"#222")}
+ if(a==="mask"){r(5,14,18,19,"#f5f5f5");r(5,19,18,19,"#cfd8ea")}
+ if(a==="earrings"){s(3,14,"#ffd23f");s(20,14,"#ffd23f")}
+ return g}
+function drawPixel(canvas,p,scale,opts){opts=opts||{};scale=scale||6;var g=grid(p),V=opts.view||[0,0,GW,GH],ol=opts.outline===false?0:1;
+ var W=(V[2]+2*ol)*scale,H=(V[3]+2*ol)*scale,c=canvas.getContext("2d");canvas.width=W;canvas.height=H;c.clearRect(0,0,W,H);
+ function at(x,y){return (x>=0&&x<GW&&y>=0&&y<GH)?g[y][x]:null}
+ var oc=opts.outlineColor||INK;
+ for(var y=V[1]-ol;y<V[1]+V[3]+ol;y++)for(var x=V[0]-ol;x<V[0]+V[2]+ol;x++){var v=at(x,y);
+  if(v){c.fillStyle=v}else if(ol&&(at(x-1,y)||at(x+1,y)||at(x,y-1)||at(x,y+1))){c.fillStyle=oc}else continue;
+  c.fillRect((x-V[0]+ol)*scale,(y-V[1]+ol)*scale,scale,scale)}
+ return canvas}
+P.drawPixel=drawPixel;P.pixelGrid=grid;P.shade=P.shade||sh;P.GRID=[GW,GH];
+})(typeof window!=="undefined"?window:this);
+
+
+/* Pixel Arcade avatar guide: same characters as the hub avatar creator (profile.js above). */
+function paLoadAvatar(){try{var r=localStorage.getItem('pa.profile.v1');if(r)return JSON.parse(r)}catch(e){}return null}
+function paAvatar(){return paLoadAvatar()||{name:'Curator',skinHex:'#f5c28f',hairStyle:'bun',hairHex:'#5a3215',outfitHex:'#8a3ffc',outfitStyle:4,accentHex:'#ffd23f',eyeHex:'#14102c',eyes:0,mouth:0,accessory:'none',extras:{}}}
+function paPixelSvg(p,scale,attrs,olc){var g=PAProfile.pixelGrid(PAProfile.clean(p)),GW=24,GH=28,ol=1,oc=olc||'#466391';function at(x,y){return (x>=0&&x<GW&&y>=0&&y<GH)?g[y][x]:null}var r='';
+ for(var y=-1;y<=GH;y++)for(var x=-1;x<=GW;x++){if(at(x,y))continue;if(at(x-1,y)||at(x+1,y)||at(x,y-1)||at(x,y+1))r+='<rect x="'+x+'" y="'+y+'" width="1" height="1" fill="'+oc+'"/>'}
+ for(var y2=0;y2<GH;y2++)for(var x2=0;x2<GW;x2++){var v=at(x2,y2);if(v)r+='<rect x="'+x2+'" y="'+y2+'" width="1" height="1" fill="'+v+'"/>'}
+ var W=GW+2*ol,H=GH+2*ol;
+ return '<svg viewBox="'+(-ol)+' '+(-ol)+' '+W+' '+H+'" width="'+Math.round(W*scale)+'" height="'+Math.round(H*scale)+'" '+(attrs||'')+' style="image-rendering:pixelated;shape-rendering:crispEdges">'+r+'</svg>'}
+function paPawn(){return paPixelSvg(paAvatar(),28/26,'aria-label="Your gallery guide"')}
+function curator(){return `<svg viewBox="0 0 280 180" role="img" aria-label="Your Pixel Arcade gallery guide"><rect x="9" y="9" width="262" height="162" rx="25" fill="#0c1732" stroke="#466391"/><path d="M52 126H91V155H52ZM187 55H231V126H187" stroke="#74d7ff" stroke-width="3" fill="#273a69"/><path d="M198 66 220 82 200 113" stroke="#80edbe" stroke-width="4"/>${paPixelSvg(paAvatar(),5,'x="75" y="15"')}<path d="M55 96V78M48 86H62" stroke="#74d7ff" stroke-width="3"/></svg>`}
 function icon(type='museum'){return `<svg viewBox="0 0 100 100" fill="none" aria-hidden="true"><path d="M12 32 50 10 88 32H12ZM14 81H86M9 91H91" stroke="#80edbe" stroke-width="6" stroke-linejoin="round"/><path d="M23 40V74M41 40V74M59 40V74M77 40V74" stroke="#74d7ff" stroke-width="7"/><circle cx="50" cy="27" r="4" fill="#b7a2ff"/></svg>`}
 function illustration(id,wide=false){let g=galleries[id],shape='';const t=g.name;
 if(g.medium==='Architecture'){let roof=t==='Gothic'?'<path d="M30 100Q30 45 65 24Q100 45 100 100"/>':t.includes('Renaissance')?'<path d="M15 57 65 28 115 57ZM20 104H110M30 60V100M53 60V100M77 60V100M100 60V100"/>':t==='Art Deco'?'<path d="M35 108V70H45V50H55V30H75V50H85V70H95V108M55 65V100M75 65V100"/>':'<path d="M22 103V42H108V103ZM22 64H108M50 43V102M79 43V102"/>';shape=`<g transform="translate(73 5)" stroke="#80edbe" fill="#253a66" stroke-width="5" stroke-linejoin="round">${roof}</g>`}
@@ -155,7 +474,7 @@ function shops(){shell(`<button class="ghost" data-route="home">← Gallery</but
 const museums=[{"id": "met", "name": "The Metropolitan Museum of Art", "city": "New York", "note": "Collection works and current display labels verified from Met records. Route is a teaching sequence, not the museum floor plan.", "rooms": [{"name": "Egypt: rulers and temples", "gid": 21, "works": [544442, 547802], "hint": "Stone can express royal power and sacred architecture.", "q": "Which work is a building, not a freestanding figure?", "a": "The Temple of Dendur", "wrong": ["Sphinx of Hatshepsut", "The Milkmaid", "The Threatened Swan"], "why": "Dendur is an Egyptian temple, completed by 10 CE. The sphinx is a royal sculpture.", "location": "Met records list these Egyptian works in Gallery 131. Display labels can change.", "source": "https://www.metmuseum.org/art/collection/search/547802"}, {"name": "South Asia: the dancing god", "gid": 24, "works": [39328], "hint": "Look for the ring, gestures and attributes around the moving figure.", "q": "What surrounds Shiva’s dance?", "a": "A flaming halo", "wrong": ["A marble staircase", "An empty picture frame", "A civic guard"], "why": "The halo, drum, fire and gestures carry meanings related to creation, destruction and refuge.", "location": "Met record lists Shiva Nataraja in Gallery 240.", "source": "https://www.metmuseum.org/art/collection/search/39328"}, {"name": "Painting: a new view of nature", "gid": 12, "works": [437680, 436535], "hint": "Compare visible brushwork, color and the treatment of a landscape.", "q": "Who painted Wheat Field with Cypresses?", "a": "Vincent van Gogh", "wrong": ["Johannes Vermeer", "Rembrandt van Rijn", "Leonardo da Vinci"], "why": "Van Gogh painted this work in 1889. Sisley’s bridge landscape was made in 1872; their marks and color choices differ.", "location": "An educational painting room, not a claim that these works hang side by side.", "source": "https://www.metmuseum.org/art/collection/search/436535"}]}, {"id": "louvre", "name": "Louvre Museum", "city": "Paris", "note": "Real collection works, original teaching diagrams. No Louvre photographs copied. Official site warns some collection room listings may be outdated.", "rooms": [{"name": "Greek sculpture: marble and identity", "gid": 23, "works": [], "title": "Venus de Milo", "artist": "Ancient Greek sculptor; name uncertain", "date": "Hellenistic period", "hint": "Drapery and a turned body can communicate movement even in still stone.", "q": "Which material is recorded for Venus de Milo?", "a": "Parian marble", "wrong": ["Painted cardboard", "Stainless steel", "Oil on canvas"], "why": "The Louvre record identifies Parian marble. Missing arms complicate identification of the figure.", "location": "Official palace page describes the Classical and Hellenistic Greek galleries. Treat room numbers as source labels, not navigation advice.", "source": "https://collections.louvre.fr/en/ark:/53355/cl010277627"}, {"name": "Victory: sculpture in motion", "gid": 23, "works": [], "title": "Winged Victory of Samothrace", "artist": "Ancient Greek sculptor; name not recorded", "date": "Probably c. 190 BCE", "hint": "Imagine fabric pressed by the wind and wings extending into space.", "q": "What does this figure personify?", "a": "Victory", "wrong": ["A milkmaid", "A pharaoh", "A civic guard captain"], "why": "The Louvre identifies the figure as the goddess of Victory, alighting on a ship after a sea battle.", "location": "Daru staircase, Room 703, Denon wing, Level 1 according to the official palace page.", "source": "https://musee.louvre.fr/en/explore/the-palace/a-stairway-to-victory"}, {"name": "Renaissance: a famous portrait", "gid": 2, "works": [], "title": "Mona Lisa", "artist": "Leonardo da Vinci", "date": "1503–1519, Louvre record range", "hint": "Think about portraiture, a seated figure and a landscape background.", "q": "Who made the Mona Lisa?", "a": "Leonardo da Vinci", "wrong": ["Hokusai", "Johannes Vermeer", "Claude Monet"], "why": "The Louvre attributes the portrait of Lisa Gherardini to Leonardo da Vinci.", "location": "Collection record labels Salle 711, Denon wing, Level 1; room metadata may change.", "source": "https://collections.louvre.fr/en/ark:/53355/cl010062370"}]}, {"id": "rijks", "name": "Rijksmuseum", "city": "Amsterdam", "note": "Real Dutch collection works, original teaching diagrams. Gallery route is invented for learning, not a copied floor plan.", "rooms": [{"name": "Everyday life: light and stillness", "gid": 6, "works": [], "title": "The Milkmaid", "artist": "Johannes Vermeer", "date": "c. 1660", "hint": "A quiet everyday action can become a carefully composed painting.", "q": "What action does the maid perform?", "a": "Pouring milk", "wrong": ["Playing a drum", "Leading a militia", "Carving marble"], "why": "The museum describes the stream of milk as the main moving element in an otherwise still scene.", "location": "Educational room inspired by the collection; not a current hanging claim.", "source": "https://www.rijksmuseum.nl/en/collection/object/The-Milkmaid--42dd0e658c2979aec8e144d2357c55c0"}, {"name": "Group portrait: people in action", "gid": 6, "works": [], "title": "The Night Watch", "artist": "Rembrandt van Rijn", "date": "1642", "hint": "A group portrait can show a company preparing to move, rather than standing in a static row.", "q": "What kind of group appears here?", "a": "Amsterdam’s civic guard", "wrong": ["A ballet company", "A group of pharaohs", "A printing workshop"], "why": "The museum identifies a civic guard company under Captain Frans Banninck Cocq.", "location": "The real Night Watch Gallery was specially designed to show this painting; our room drawing is schematic.", "source": "https://www.rijksmuseum.nl/en/collection/object/The-Night-Watch-Militia-Company-of-District-II-under-the-Command-of-Captain-Frans-Banninck-Cocq--3137deb45cd7765f9a76084a16c99544"}, {"name": "Animals: a dramatic moment", "gid": 6, "works": [], "title": "The Threatened Swan", "artist": "Jan Asselijn", "date": "c. 1650", "hint": "Observe pose, threat and the relationship between a bird and its surroundings.", "q": "Which animal is the subject?", "a": "A swan", "wrong": ["A lion", "A horse", "A whale"], "why": "Jan Asselijn painted a swan defending its nest. Later inscriptions gave the picture a political interpretation.", "location": "Educational collection room, not a current hanging claim.", "source": "https://www.rijksmuseum.nl/en/collection/object/The-Threatened-Swan--22040f90565e730131983a44a85b989f"}]}];let museum=null,roomIndex=0,museumMode='browse',roomSolved=false;
 function chapterArt(id){let map={1:698054,21:544442,24:39328};let a=artworks.find(x=>x.id===map[id]);return a?`<figure style="margin:12px 0"><img class="art art-tall" src="${a.img}" alt="${E(a.title)}"><figcaption class="muted">${E(a.title)} · ${E(a.date)}<br>Image: The Met, Open Access, CC0.</figcaption><a href="${a.url}" target="_blank" rel="noopener noreferrer">Actual collection work ↗</a></figure>`:''}
 function museumSelector(){route='museums';shell(`<div class="eyebrow">Museum adventures</div><h1>Where will you wander?</h1><p>Pick a museum, then walk from room to room. Explore freely or take a detective challenge in every room.</p>${nav()}<div class="buttons"><button id="browseMuseum" class="${museumMode==='browse'?'primary':''}">Free browse</button><button id="challengeMuseum" class="${museumMode==='quest'?'primary':''}">Room challenges</button></div><div class="grid">${museums.map(m=>`<button class="card museum-card" data-museum="${m.id}">${icon()}<h2>${E(m.name)}</h2><p class="muted">${E(m.city)} · ${m.rooms.length} learning rooms</p><span class="tag">${m.id==='met'?'Real CC0 collection images':'Original diagrams + real work records'}</span></button>`).join('')}</div><footer>Original educational rooms and routes, not museum floor plans. These games are not affiliated with the museums. Work details are sourced to each museum’s own collection records. Display locations may change.</footer>`);$('#browseMuseum').onclick=()=>{museumMode='browse';museumSelector()};$('#challengeMuseum').onclick=()=>{museumMode='quest';museumSelector()};document.querySelectorAll('[data-museum]').forEach(b=>b.onclick=()=>{museum=museums.find(m=>m.id===b.dataset.museum);roomIndex=0;roomView()})}
-function roomMap(){return `<div class="room-map" aria-label="Schematic learning route">${museum.rooms.map((r,i)=>`<button class="room-door ${i===roomIndex?'current':''}" data-room="${i}"><span>${i===roomIndex?'<svg width="28" height="32" viewBox="0 0 28 32" aria-label="Your gallery guide"><circle cx="14" cy="10" r="8" fill="#80edbe"/><path d="M4 32Q3 18 14 18Q25 18 24 32" fill="#b7a2ff"/><circle cx="11" cy="10" r="1" fill="#132743"/><circle cx="17" cy="10" r="1" fill="#132743"/></svg>':i+1}</span><small>${i===roomIndex?'You are here':(state.rooms||[]).includes(museum.id+'-'+i)?'Stamp earned':'Enter room'}</small></button>`).join('')}</div>`}
+function roomMap(){return `<div class="room-map" aria-label="Schematic learning route">${museum.rooms.map((r,i)=>`<button class="room-door ${i===roomIndex?'current':''}" data-room="${i}"><span>${i===roomIndex?paPawn():i+1}</span><small>${i===roomIndex?'You are here':(state.rooms||[]).includes(museum.id+'-'+i)?'Stamp earned':'Enter room'}</small></button>`).join('')}</div>`}
 function artWall(r){if(r.works.length)return `<div class="room-art">${r.works.map(id=>{let a=artworks.find(x=>x.id===id);return `<figure><img class="art art-tall" src="${a.img}" alt="${museumMode==='quest'?'Collection work for the room challenge':E(a.title)}"><figcaption class="muted">${museumMode==='browse'?E(a.title)+'<br>'+E(a.artist)+', '+E(a.date):'A work from this museum’s collection. Title revealed after the challenge.'}</figcaption>${museumMode==='browse'?`<p class="muted">Image: The Met, Open Access, CC0.</p><a href="${a.url}" target="_blank" rel="noopener noreferrer">Collection record ↗</a>`:''}</figure>`}).join('')}</div>`;return `<div class="room-display">${objectDiagram(r.title)}<p class="muted">Original learning illustration, not a reproduction or photograph of the named work.</p>${museumMode==='browse'?`<h2>${E(r.title)}</h2><p>${E(r.artist)} · ${E(r.date)}</p>`:''}</div>`}
 function objectDiagram(title){let shapes=title.includes('Mona')||title.includes('Milk')?'<rect x="66" y="14" width="146" height="130" rx="9" fill="#20385b"/><path d="M103 130Q94 86 141 80Q187 86 181 130" fill="#b7a2ff"/><circle cx="140" cy="55" r="24" fill="#80edbe"/><path d="M117 43Q141 8 164 43" stroke="#74d7ff" stroke-width="8"/><path d="M138 89 192 116" stroke="#80edbe" stroke-width="9"/>':title.includes('Swan')?'<path d="M96 117Q40 71 98 55Q151 45 201 97Q228 110 219 127Q152 148 96 117" fill="#b7a2ff"/><path d="M183 93Q232 29 187 30Q163 34 184 58" stroke="#80edbe" stroke-width="12" fill="none"/><path d="M111 80 67 30 145 100" fill="#74d7ff"/>':title.includes('Night')?'<g fill="#80edbe"><circle cx="89" cy="48" r="14"/><circle cx="140" cy="34" r="15"/><circle cx="192" cy="48" r="14"/></g><g stroke="#74d7ff" stroke-width="9"><path d="M89 68V125M140 57V133M192 67V122M75 98 185 84"/></g>':'<path d="M106 142 120 87Q93 61 113 36Q140 17 160 40Q174 65 151 88L174 142Z" fill="#b7a2ff" stroke="#74d7ff" stroke-width="3"/>'+ (title.includes('Victory')?'<path d="M110 78 57 32 75 96M158 79 220 31 199 102" fill="#80edbe"/>':'');return `<svg class="illustration" viewBox="0 0 280 165" role="img" aria-label="Original schematic teaching diagram"><rect x="3" y="3" width="274" height="159" rx="21" fill="#0d1732" stroke="#46618b"/>${shapes}</svg>`}
 function roomView(){let r=museum.rooms[roomIndex];roomSolved=false;let opts=shuffle([r.a,...r.wrong]);shell(`<button class="ghost" id="leaveMuseum">← Museums</button><div class="eyebrow">${E(museum.name)} · Room ${roomIndex+1} of ${museum.rooms.length}</div><h1>${E(r.name)}</h1>${roomMap()}<div class="card"><p class="muted">${E(museum.note)}</p>${artWall(r)}<p>${E(r.hint)}</p><details><summary>Room source & real-world location</summary><p class="muted">${E(r.location)}</p><a href="${r.source}" target="_blank" rel="noopener noreferrer">Official museum source ↗</a><p class="muted">Met images: CC0 Open Access. Other museum rooms: original diagrams; no rights-restricted photographs used.</p></details>${museumMode==='quest'?`<h2>${E(r.q)}</h2>${opts.map((a,i)=>`<button class="choice" data-room-answer="${i}">${E(a)}</button>`).join('')}<div id="roomFeedback" aria-live="polite"></div>`:`<button id="roomChallenge" class="primary">Try this room’s challenge</button>`}</div><div class="buttons"><button id="prevRoom" ${roomIndex===0?'disabled':''}>← Previous room</button><button class="primary" id="nextRoom">${roomIndex===museum.rooms.length-1?'Finish visit':'Next room →'}</button></div><button id="roomLesson" class="ghost">Learn the related style</button><p class="muted">Browse mode never locks doors. Challenge stamps are collected on this device.</p>`);$('#leaveMuseum').onclick=museumSelector;$('#prevRoom').onclick=()=>{roomIndex--;roomView()};$('#nextRoom').onclick=()=>{if(roomIndex<museum.rooms.length-1){roomIndex++;roomView()}else finishMuseum()};$('#roomLesson').onclick=()=>lesson(r.gid);document.querySelectorAll('[data-room]').forEach(b=>b.onclick=()=>{roomIndex=+b.dataset.room;roomView()});if(museumMode==='browse')$('#roomChallenge').onclick=()=>{museumMode='quest';roomView()};else document.querySelectorAll('[data-room-answer]').forEach(b=>b.onclick=()=>{if(roomSolved)return;roomSolved=true;let ok=opts[+b.dataset.roomAnswer]===r.a;document.querySelectorAll('[data-room-answer]').forEach(x=>{x.disabled=true;x.classList.toggle('correct',opts[+x.dataset.roomAnswer]===r.a);x.classList.toggle('wrong',x===b&&!ok)});if(ok){state.rooms=state.rooms||[];let k=museum.id+'-'+roomIndex;if(!state.rooms.includes(k)){state.rooms.push(k);state.stars+=2;save()}}$('#roomFeedback').innerHTML=`<div class="feedback ${ok?'':'error'}"><h3>${ok?'Room stamp earned!':'A discovery to keep'}</h3><p>${ok?'':'The right answer: '+E(r.a)+'. '}${E(r.why)}</p>${r.title?`<p><b>${E(r.title)}</b><br>${E(r.artist)}, ${E(r.date)}</p>`:r.works.map(id=>artworks.find(a=>a.id===id)).filter(Boolean).map(a=>`<p><b>${E(a.title)}</b><br>${E(a.artist)}, ${E(a.date)}<br>Image: The Met, Open Access, CC0.</p>`).join('')}<a href="${r.source}" target="_blank" rel="noopener noreferrer">See the real collection record ↗</a></div>`})}
