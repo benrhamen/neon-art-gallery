@@ -422,7 +422,7 @@ function ladderResult(){let L=ladder,unlocked=ladderSaveClear(L.topic,L.points,L
  shell(`<div class="card" style="text-align:center">${L.correct>=8?medalSvg():''}<div class="eyebrow">${L.correct>=8?'Round complete':'Round finished'}</div><h1>${L.points} points</h1><h2>${L.correct} / ${L.qs.length} correct</h2><p>${L.correct>=8?'Round cleared!':'Clear a round with 8 or more correct.'} ${L.mode==='choice'?`Choice clears on ${LADDER_TOPICS[L.topic]}: ${Math.min(clears,3)} / 3.`:`Best on this topic: ${(state.ladder.best||{})[L.topic]||L.points} pts.`}</p>${unlocked?`<p class="tag">Typing mode unlocked for ${LADDER_TOPICS[L.topic]}!</p>`:''}<div class="buttons"><button class="primary" id="ladderAgain">Play again</button><button id="ladderSetupBtn">Change topic or mode</button></div></div>`);
  $('#ladderAgain').onclick=()=>{ladder={topic:L.topic,mode:L.mode,qs:ladderGen(L.topic),i:0,points:0,correct:0};ladderQuestion()};
  $('#ladderSetupBtn').onclick=ladderSetup}
-function nav(){return `<nav class="nav" aria-label="Game areas">${[['home','Home'],['explore','Roam'],['trail','Trail'],['play','Games'],['collection','Collection'],['museums','Museums']].map(([id,n])=>`<button class="${route===id||(id==='play'&&(route==='explore'||route==='trail'))?'active':''}" data-route="${id}">${n}</button>`).join('')}</nav>`}
+function nav(){return ''}
 let navStack=[],navRestore=false;
 function shell(html){
  const fn=shell.caller;
