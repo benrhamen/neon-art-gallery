@@ -400,7 +400,6 @@ function LV(){return setI?POP_LEVELS2:POP_LEVELS}
 function prog(){try{return JSON.parse(localStorage.getItem(SK()))||{}}catch(e){return{}}}
 function saveP(p){try{localStorage.setItem(SK(),JSON.stringify(p))}catch(e){}}
 function total(p){var t=0;for(var k in p)t+=p[k];return t}
-function grandTotal(){var t=0;try{var a=JSON.parse(localStorage.getItem("pa.crumble.v1"))||{};for(var k in a)t+=a[k]}catch(e){}try{var b=JSON.parse(localStorage.getItem("pa.crumble.v2"))||{};for(var k2 in b)t+=b[k2]}catch(e){}return t}
 var RUNK="pa.crumble.run.v1";
 function loadRun(){try{var r=JSON.parse(localStorage.getItem(RUNK));if(r&&typeof r.i==="number"&&r.c&&(r.s?POP_LEVELS2:POP_LEVELS)[r.i])return r}catch(e){}return null}
 function saveRun(){if(!S||done)return;try{localStorage.setItem(RUNK,JSON.stringify({s:setI,i:lv,m:moves,c:S}))}catch(e){}}
@@ -416,8 +415,8 @@ function sectionChallenge(p){var h='<div class="ag4menu" style="text-align:left;
   h+='</div>'}
  return h}
 function menu(){stop();PA.backs=[];dead=false;var p0,p1;setI=0;p0=prog();setI=1;p1=prog();setI=0;
- PA.stats("Stars "+grandTotal()+" of "+POP_LEVELS2.length*3);
- var h='<div class="ag4menu"><h2>Crumble Climb</h2><p class="muted">Smash the crumbling bricks, climb one-brick steps and reach the golden doorway. Fewer moves earn more stars.</p></div>';
+ PA.stats("Stars "+total(p1)+" of "+POP_LEVELS2.length*3);
+ var h='<div class="ag4menu"><h2>Crumble Climb</h2><p class="muted">Smash the crumbling bricks, climb one-brick steps and reach the golden doorway. Fewer moves earn more stars.</p></div>';if(total(p0)>0)h+='<div class="ag4menu" style="padding-top:0"><p class="muted" style="margin:0">'+total(p0)+' stars earned on the retired Classic towers stay on your record.</p></div>';
  var run=loadRun();
  if(run){var ri=run.i,rp=run.s?p1:p0,ropen=ri===0||(run.s?(ri%25===0?eraDone(rp,Math.floor(ri/25)-1)>=20:rp[ri-1]>0):rp[ri-1]>0);if(!ropen)run=null}
  if(run)h+='<div class="ag4menu" style="padding-top:0"><button class="primary" id="ag4resume">Resume: Level '+(run.i+1)+(run.s?' (Challenge)':'')+' \u00B7 '+run.m+' move'+(run.m===1?'':'s')+'</button><p class="muted" style="margin:6px 0 0">Your unfinished tower is saved on this device - or pick any level below to start fresh.</p></div>';
@@ -501,7 +500,7 @@ function die(){dead=true;fx.shake(9);fx.burst((S.x+.5)*C,(S.y+.5)*C,26,["#ff7a5c
 function upd(){PA.stats("Level "+(lv+1)+(setI?" \u00B7 "+ERAS[era].n+" (Challenge)":"")+"  Moves "+moves+"  Par "+LV()[lv].par)}
 function win(){done=true;clearRun();var par=LV()[lv].par,st=moves<=par?3:moves<=par+4?2:1,p=prog(),before=total(p);if((p[lv]||0)<st)p[lv]=st;saveP(p);var tot=total(p);if(tot>before)PA.boardBest(setI?"archcrumble2":"archcrumble",setI?"Crumble Climb Challenge, total stars":"Crumble Climb, total stars",tot,"stars",false,"");
  PA.beep(784,.2);setTimeout(function(){PA.beep(1046,.3)},150);fx.burst((S.ex+.5)*C,(S.ey+.5)*C,40,["#ffe08a","#80edbe","#74d7ff","#b7a2ff"],{sp:170,life:1.1,up:80,size:5});fx.text((S.ex+.5)*C,S.ey*C,st+" star"+(st>1?"s":""),"#ffe08a");
- PA.stats("Stars "+grandTotal()+" of "+POP_LEVELS2.length*3);PA.$("res").innerHTML='<div class="ag4msg"><h2>Doorway reached: '+st+' star'+(st>1?"s":"")+'</h2><p>'+moves+' moves (par '+par+')</p></div><div class="ag4row"><button class="primary" id="nx">'+(lv+1<LV().length?"Next level":"All levels")+'</button><button id="ls">Levels</button></div>';
+ PA.stats("Stars "+tot+" of "+(setI?POP_LEVELS2.length:POP_LEVELS.length)*3);PA.$("res").innerHTML='<div class="ag4msg"><h2>Doorway reached: '+st+' star'+(st>1?"s":"")+'</h2><p>'+moves+' moves (par '+par+')</p></div><div class="ag4row"><button class="primary" id="nx">'+(lv+1<LV().length?"Next level":"All levels")+'</button><button id="ls">Levels</button></div>';
  PA.$("nx").onclick=function(){lv+1<LV().length?play(lv+1,setI):menu()};PA.$("ls").onclick=menu}
 window.addEventListener("keydown",function(e){if(!S||!document.getElementById("agk"))return;var k=e.key;
  if(k==="ArrowLeft")act("L");else if(k==="ArrowRight")act("R");
